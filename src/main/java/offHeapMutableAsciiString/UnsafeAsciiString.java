@@ -1,4 +1,4 @@
-package org.example;
+package offHeapMutableAsciiString;
 
 import lombok.Getter;
 import org.agrona.DirectBuffer;
@@ -76,7 +76,7 @@ public class UnsafeAsciiString implements CharSequence {
             if (value == 0) {
                 return hashCode;
             }
-            hashCode = 31 * hashCode + Long.hashCode(value);
+            hashCode = (hashCode << 5) - hashCode + Long.hashCode(value);
         }
         return hashCode;
     }
@@ -90,6 +90,9 @@ public class UnsafeAsciiString implements CharSequence {
             if (this.buffer.capacity() == other.buffer.capacity()) {
                 return this.buffer.compareTo(other.buffer) == 0;
             }
+            if (this.buffer.capacity() > other.buffer.capacity()) {
+                return unsafeEquals(other, this);
+            }
             return unsafeEquals(this, other);
         }
 
@@ -100,7 +103,7 @@ public class UnsafeAsciiString implements CharSequence {
     }
 
     //TODO: Explore whether backwards heuristic is quicker
-    private static boolean unsafeEquals(final UnsafeAsciiString a, final UnsafeAsciiString b) {
+    public static boolean unsafeEquals(final UnsafeAsciiString a, final UnsafeAsciiString b) {
         for (int i = 0; i + 8 <= a.buffer.capacity(); i += 8) {
             if (a.buffer.getLong(i) != b.buffer.getLong(i)) {
                 return false;
@@ -148,6 +151,11 @@ public class UnsafeAsciiString implements CharSequence {
             throw new IndexOutOfBoundsException("Index: " + start + ", Length: " + length);
         }
         return this.buffer.getStringAscii(start, end);
+    }
+
+    @Override
+    public String toString() {
+        return this.buffer.getStringAscii(0);
     }
 
     //TODO: parallelize on long and then recur when long == 0

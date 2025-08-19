@@ -13,14 +13,28 @@ repositories {
 dependencies {
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation('org.agrona:agrona:2.2.3')
     implementation('org.projectlombok:lombok:1.18.38')
     jmh 'commons-io:commons-io:2.14.0'
-    jmh 'org.openjdk.jmh:jmh-core:1.37.0'
-    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.37.0'
-    jmh 'org.openjdk.jmh:jmh-generator-bytecode:1.37.0'
+    jmh 'org.openjdk.jmh:jmh-core:1.37'
+    jmh 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+    jmh 'org.openjdk.jmh:jmh-generator-bytecode:1.37'
+
+    jmhAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.36'
+}
+
+tasks.withType(JavaCompile) {
+    options.compilerArgs += '--enable-preview'
+    options.compilerArgs += '--add-modules'
+    options.compilerArgs += 'jdk.incubator.vector'
 }
 
 test {
+    jvmArgs('--enable-preview', '--add-opens', 'java.base/jdk.internal.misc=ALL-UNNAMED', '-Dagrona.disable.bounds.checks=true', '--add-modules', 'jdk.incubator.vector')
     useJUnitPlatform()
+}
+
+jmh {
+    jvmArgs = ['--enable-preview', '--add-opens', 'java.base/jdk.internal.misc=ALL-UNNAMED', '-Dagrona.disable.bounds.checks=true', '--add-modules', 'jdk.incubator.vector']
 }
