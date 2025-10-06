@@ -19,10 +19,8 @@ import static java.util.Objects.requireNonNull;
 public class BytesToIntOffHeapMap<T extends Codec> implements Map<T, Integer> {
 
     private final UnsafeBuffer buffer;
-    private final UnsafeBuffer tempBuffer = new UnsafeBuffer();
     private final float loadFactor;
     private final int singleEntrySize;
-
     private final short codecSize;
 
     private int capacity;
@@ -100,8 +98,7 @@ public class BytesToIntOffHeapMap<T extends Codec> implements Map<T, Integer> {
         @DoNotSub int index = Hashing.hash(codec, mask);
         int offset = index * singleEntrySize;
         while (buffer.getByte(offset) != 0) {
-            tempBuffer.wrap(buffer, offset + OCCUPIED_MARKER_SIZE, codecSize);
-            if (tempBuffer.compareTo(codec.buffer()) == 0) {
+            if (BufferUtils.bufferEquals(codec.buffer(), buffer, offset + OCCUPIED_MARKER_SIZE, codecSize)) {
                 return buffer.getInt(offset + OCCUPIED_MARKER_SIZE + codecSize);
             }
             index = ++index & mask;
@@ -210,8 +207,7 @@ public class BytesToIntOffHeapMap<T extends Codec> implements Map<T, Integer> {
         int offset = 0;
         for (@DoNotSub int i = 0; i < oldCapacity; i++) {
             if (buffer.getByte(offset) != 0) {
-                tempBuffer.wrap(buffer, offset + OCCUPIED_MARKER_SIZE, codecSize);
-                int index = Hashing.hash(tempBuffer.hashCode(), mask);
+                @DoNotSub int index = Hashing.hash(BufferUtils.segmentHashCode(buffer, offset + OCCUPIED_MARKER_SIZE, codecSize), mask);
                 int newOffset = index * singleEntrySize;
                 while (newBuffer.getByte(newOffset) != 0) {
                     index = ++index & mask;
