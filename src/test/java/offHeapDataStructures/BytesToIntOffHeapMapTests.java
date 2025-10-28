@@ -4,7 +4,6 @@ import offHeapMutableAsciiString.UnsafeAsciiString;
 import org.agrona.collections.Object2LongHashMap;
 import org.junit.jupiter.api.Test;
 import slab.ConcreteTestCodec;
-import slab.ConcreteTestOrder;
 import slab.TestCodec;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

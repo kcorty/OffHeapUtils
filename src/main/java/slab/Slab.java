@@ -8,7 +8,6 @@ import org.agrona.concurrent.UnsafeBuffer;
 import java.nio.ByteBuffer;
 import java.util.function.Supplier;
 
-import static slab.SlabPage.SLAB_PAGE_HEADER_SIZE;
 import static slab.SlabPage.SLAB_PAGE_LIVE_PADDING_SIZE;
 
 public class Slab<T extends Codec> {
@@ -39,8 +38,7 @@ public class Slab<T extends Codec> {
         }
         this.shiftCount = shiftCount;
 
-        this.singlePageSize = SLAB_PAGE_HEADER_SIZE +
-                (alignedPageElementCount * (codecSize + SLAB_PAGE_LIVE_PADDING_SIZE));
+        this.singlePageSize = alignedPageElementCount * (codecSize + SLAB_PAGE_LIVE_PADDING_SIZE);
         final UnsafeBuffer unsafeBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(
                 initialPageCount * singlePageSize));
         this.cleanPageIndices = new IntArrayQueue(Math.max(initialPageCount, IntArrayQueue.MIN_CAPACITY), -1);
@@ -82,6 +80,14 @@ public class Slab<T extends Codec> {
         final var pageIndex = index >> shiftCount;
         final var page = pages[pageIndex];
         page.getAt(inPageIndex, codec);
+    }
+
+    public T get(final int index) {
+        final var inPageIndex = index & inPageIndexMask;
+        final var pageIndex = index >> shiftCount;
+        final var page = pages[pageIndex];
+        page.getAt(inPageIndex, reusableCodec);
+        return reusableCodec;
     }
 
     public void removeAt(final int index) {

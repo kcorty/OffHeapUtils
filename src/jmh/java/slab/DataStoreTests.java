@@ -1,6 +1,5 @@
 package slab;
 
-
 import offHeapDataStructures.BytesToIntOffHeapMap;
 import offHeapMutableAsciiString.UnsafeAsciiString;
 import org.agrona.collections.Object2ObjectHashMap;
@@ -12,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Fork(3)
+@Fork(1)
 @Warmup(iterations = 2, time = 1000, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 5, time = 1000, timeUnit = TimeUnit.MILLISECONDS)
 public class DataStoreTests {
@@ -22,15 +21,18 @@ public class DataStoreTests {
             2048, 0.65f);
 
     private final ConcreteTestOrder concreteTestOrder = new ConcreteTestOrder();
+    private final TestOrder testOrder = new TestOrder();
     private final UnsafeAsciiString lookupKey = new UnsafeAsciiString(40);
-    private Slab<ConcreteTestOrder> slab = null;
+    private final Slab<TestOrder> slab = new Slab<>((short) 256, 8, () -> this.testOrder);
     private final BytesToIntOffHeapMap<UnsafeAsciiString> offHeapMap = new BytesToIntOffHeapMap<>(2048,
             () -> new UnsafeAsciiString(40));
+
+    private final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.65f,
+            TestOrder.ASCII_OFFSET, TestOrder.ASCII_LENGTH, slab);
 
     @Setup(Level.Iteration)
     public void setup() {
         lookupKey.set("ABC123");
-        this.slab = new Slab<>((short) 256, 8, () -> this.concreteTestOrder);
         for (int i = 0; i < 2048; i++) {
             this.concreteTestOrdersPool.push(new ConcreteTestOrder());
         }
@@ -50,10 +52,24 @@ public class DataStoreTests {
 
     @Benchmark
     public void testOffHeapBacked() {
-        final int index = slab.create(concreteTestOrder);
-        concreteTestOrder.getUnsafeAsciiString().set(lookupKey);
-        offHeapMap.put(concreteTestOrder.getUnsafeAsciiString(), index);
+        final int index = slab.create(testOrder);
+        testOrder.getUnsafeAsciiString().set(lookupKey);
+        offHeapMap.put(testOrder.getUnsafeAsciiString(), index);
         final var resolvedIndex = offHeapMap.removeKey(lookupKey);
         slab.removeAt(resolvedIndex);
+    }
+
+    @Benchmark
+    public void testSlabKeyStore() {
+        final int index = slab.create(testOrder);
+        testOrder.getUnsafeAsciiString().set(lookupKey);
+        slabKeyStore.insert(index, testOrder);
+        slabKeyStore.remove(index, testOrder);
+        slab.removeAt(index);
+    }
+
+    @Benchmark
+    public void baseline() {
+        concreteTestOrder.getUnsafeAsciiString().set(lookupKey);
     }
 }

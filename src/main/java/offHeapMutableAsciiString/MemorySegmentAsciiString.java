@@ -1,12 +1,13 @@
 package offHeapMutableAsciiString;
 
+import jdk.incubator.vector.LongVector;
+import jdk.incubator.vector.VectorSpecies;
+
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 import java.util.InputMismatchException;
-import jdk.incubator.vector.LongVector;
-import jdk.incubator.vector.VectorSpecies;
 
 public class MemorySegmentAsciiString {
 

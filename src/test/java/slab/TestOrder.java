@@ -7,7 +7,12 @@ import org.agrona.concurrent.UnsafeBuffer;
 
 public class TestOrder implements Codec {
 
+    protected final UnsafeAsciiString unsafeAsciiString = new UnsafeAsciiString();
+
     private final MutableDirectBuffer buffer = new UnsafeBuffer();
+
+    public static final short ASCII_OFFSET = 0;
+    public static final short ASCII_LENGTH = 40;
 
     @Override
     public short bufferSize() {
@@ -24,5 +29,14 @@ public class TestOrder implements Codec {
         return buffer;
     }
 
+    @Override
+    public int keyHashCode() {
+        return BufferUtils.segmentHashCodeShortCircuiting(this.buffer, ASCII_OFFSET, ASCII_LENGTH);
+    }
+
+    public UnsafeAsciiString getUnsafeAsciiString() {
+        unsafeAsciiString.wrap(this.buffer, ASCII_OFFSET, ASCII_LENGTH);
+        return unsafeAsciiString;
+    }
 
 }

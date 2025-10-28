@@ -39,7 +39,7 @@ public class Cursor<T extends Codec> {
         }
         final int newIndex = cleanPageIndices.pollInt();
         this.currentPage = pages[newIndex];
-        this.currPageIndex = currentPage.getPageIndex() *  pageElementCount;
+        this.currPageIndex = currentPage.getPageIndex() * pageElementCount;
         nextPageIndex = 0;
     }
 

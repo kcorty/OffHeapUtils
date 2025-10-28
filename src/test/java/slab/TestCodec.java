@@ -25,6 +25,11 @@ public class TestCodec implements Codec {
     }
 
     @Override
+    public int keyHashCode() {
+        return buffer.hashCode();
+    }
+
+    @Override
     public int hashCode() {
         return buffer.hashCode();
     }

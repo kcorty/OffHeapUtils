@@ -10,4 +10,6 @@ public interface Codec {
     void wrap(final MutableDirectBuffer buffer, final int offset, final int length);
 
     DirectBuffer buffer();
+
+    int keyHashCode();
 }

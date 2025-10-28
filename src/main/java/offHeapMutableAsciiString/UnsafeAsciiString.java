@@ -4,7 +4,6 @@ import lombok.Getter;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
-import slab.BufferUtils;
 import slab.Codec;
 
 import java.nio.ByteBuffer;
@@ -14,6 +13,10 @@ import java.util.InputMismatchException;
 public class UnsafeAsciiString implements CharSequence, Codec {
     @Getter
     private final MutableDirectBuffer buffer;
+
+    public UnsafeAsciiString() {
+        this.buffer = new UnsafeBuffer();
+    }
 
     public UnsafeAsciiString(final int size) {
         if ((size & 7) != 0) {
@@ -27,6 +30,10 @@ public class UnsafeAsciiString implements CharSequence, Codec {
             throw new InputMismatchException("Buffer size must be word aligned to 8 bytes!");
         }
         this.buffer = new UnsafeBuffer(otherBuffer, offset, size);
+    }
+
+    public void wrap(final DirectBuffer buffer, final int offset, final int length) {
+        this.buffer.wrap(buffer, offset, length);
     }
 
     public void set(final CharSequence charSequence) {
@@ -77,7 +84,7 @@ public class UnsafeAsciiString implements CharSequence, Codec {
             if (value == 0) {
                 return hashCode;
             }
-            hashCode = (hashCode << 5) - hashCode + Long.hashCode(value);
+            hashCode = hashCode * 31 + Long.hashCode(value);
         }
         return hashCode;
     }
@@ -185,5 +192,10 @@ public class UnsafeAsciiString implements CharSequence, Codec {
     @Override
     public DirectBuffer buffer() {
         return this.buffer;
+    }
+
+    @Override
+    public int keyHashCode() {
+        return hashCode();
     }
 }

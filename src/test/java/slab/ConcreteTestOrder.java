@@ -1,6 +1,5 @@
 package slab;
 
-import lombok.Getter;
 import offHeapMutableAsciiString.UnsafeAsciiString;
 import org.agrona.concurrent.UnsafeBuffer;
 
