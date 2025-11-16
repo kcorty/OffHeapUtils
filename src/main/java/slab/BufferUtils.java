@@ -36,7 +36,6 @@ public class BufferUtils {
 
     public static boolean bufferEquals(final DirectBuffer buffer, final int bufferOffset,
                                        final DirectBuffer other, final int otherOffset, final int otherLength) {
-
         int i = 0;
 
         for (final int end = otherLength & ~7; i < end; i +=8) {

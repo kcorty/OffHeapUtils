@@ -1,5 +1,6 @@
 package slab;
 
+import org.agrona.DirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 
 public class SlabPage<T extends Codec> {
@@ -29,6 +30,13 @@ public class SlabPage<T extends Codec> {
     public void getAt(final int index, final T codec) {
         final int codecOffset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
         codec.wrap(pageBuffer, codecOffset, codecSize);
+    }
+
+    public boolean equalsUnderlying(final int index, final short inCodecOffset, final int compareSize,
+                                 final DirectBuffer otherBuffer, final int otherOffset) {
+        final int codecOffset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
+        return BufferUtils.bufferEquals(pageBuffer, codecOffset + inCodecOffset,
+                otherBuffer, otherOffset, compareSize);
     }
 
     public int removeAt(final int index) {

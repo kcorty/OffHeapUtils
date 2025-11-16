@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
-@Fork(3)
+@Fork(1)
 @Warmup(iterations = 2, time = 1000, timeUnit = TimeUnit.MILLISECONDS)
 @Measurement(iterations = 5, time = 2000, timeUnit = TimeUnit.MILLISECONDS)
 public class DataStoreTests {
@@ -64,8 +64,8 @@ public class DataStoreTests {
         final int index = slab.create(testOrder);
         testOrder.getUnsafeAsciiString().set(lookupKey);
         slabKeyStore.insert(index, testOrder);
-        slabKeyStore.remove(index, testOrder);
-        slab.removeAt(index);
+        final int removedKey = slabKeyStore.removeCodec(testOrder);
+        slab.removeAt(removedKey);
     }
 
     @Benchmark

@@ -20,8 +20,8 @@ public class SlabKeyStore<T extends Codec> {
 
     private static final int MISSING_VALUE = -1;
 
-    public SlabKeyStore(final int capacity, final float loadFactor, final short codecKeyOffset, final short codecKeySize,
-                        final Slab<T> slab) {
+    public SlabKeyStore(final int capacity, final float loadFactor, final short codecKeyOffset,
+                        final short codecKeySize, final Slab<T> slab) {
         this.capacity = BitUtil.findNextPositivePowerOfTwo(capacity);
         this.loadFactor = loadFactor;
         this.nextResizeLimit = (int) (this.capacity * loadFactor);
@@ -57,23 +57,73 @@ public class SlabKeyStore<T extends Codec> {
         tryIncreaseCapacity();
     }
 
-    public boolean wrapFromKey(final DirectBuffer buffer, final int bufferOffset, final T codec) {
+    public int wrapFromKey(final DirectBuffer lookupBuffer, final int bufferOffset,
+                           final int hashCode) {
+        final int mask = this.capacity - 1;
+        int index = hashCode & mask;
+        int existingSlabIndex;
+        while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
+            final var foundCodec = slab.get(existingSlabIndex);
+            if (BufferUtils.bufferEquals(foundCodec.buffer(), codecKeyOffset,
+                    lookupBuffer, bufferOffset, codecKeySize)) {
+                return existingSlabIndex;
+            }
+            index = ++index & mask;
+        }
+        return MISSING_VALUE;
+    }
+
+    //When looking up with a codec, ensure that it was not previously used in a create and is currently wrapped
+    //on a location of the slab. This can lead to incorrect return values and you will overwrite the slab data.
+    public int wrapFromKey(final T codec) {
         final int mask = this.capacity - 1;
         int index = codec.keyHashCode() & mask;
         int existingSlabIndex;
         while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
-            slab.getAt(existingSlabIndex, codec);
-            if (BufferUtils.bufferEquals(buffer, bufferOffset, codec.buffer(), codecKeyOffset, codecKeySize)) {
-                return true;
+            final var foundCodec = slab.get(existingSlabIndex);
+            if (BufferUtils.bufferEquals(foundCodec.buffer(), codecKeyOffset,
+                    codec.buffer(), codecKeyOffset, codecKeySize)) {
+                return existingSlabIndex;
             }
             index = ++index & mask;
         }
-        return false;
+        return MISSING_VALUE;
     }
 
-    public boolean removeCodec(final T codec) {
+    public int removeCodec(final T codec) {
+        final int mask = this.capacity - 1;
+        int index = codec.keyHashCode() & mask;
+        int existingSlabIndex;
+        while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
+            if (slab.equalsUnderlying(existingSlabIndex, codecKeyOffset,
+                    codecKeySize, codec.buffer(), codecKeyOffset)) {
+                buffer.putInt(index << 2, MISSING_VALUE);
+                size--;
+                tryCompact(index);
+                return existingSlabIndex;
+            }
+            index = ++index & mask;
+        }
+        return MISSING_VALUE;
+    }
 
-        return false;
+    public int removeFromKey(final DirectBuffer lookupBuffer, final int bufferOffset,
+                             final int hashCode) {
+        final int mask = this.capacity - 1;
+        int index = hashCode & mask;
+        int existingSlabIndex;
+        while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
+            final var foundCodec = slab.get(existingSlabIndex);
+            if (BufferUtils.bufferEquals(foundCodec.buffer(), codecKeyOffset,
+                    lookupBuffer, bufferOffset, codecKeySize)) {
+                this.buffer.putInt(index << 2, MISSING_VALUE);
+                size--;
+                tryCompact(index);
+                return existingSlabIndex;
+            }
+            index = ++index & mask;
+        }
+        return MISSING_VALUE;
     }
 
     public boolean removeAt(final int slabIndex) {
@@ -111,8 +161,8 @@ public class SlabKeyStore<T extends Codec> {
         newBuffer.setMemory(0, newBuffer.capacity(), (byte) -1);
         final int mask = capacity - 1;
         this.nextResizeLimit = (int) (this.capacity * loadFactor);
-        for (int readOffset = 0; readOffset < oldCapacity; readOffset += 4) {
-            final int value = buffer.getInt(readOffset);
+        for (int readIndex = 0; readIndex < oldCapacity; readIndex++) {
+            final int value = buffer.getInt(readIndex << 2);
             if (value != MISSING_VALUE) {
                 final T codec = slab.get(value);
                 if (codec == null) {
@@ -150,5 +200,19 @@ public class SlabKeyStore<T extends Codec> {
                 deleteIndex = index;
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("[");
+        for (int i = 0; i < capacity; i++) {
+            stringBuilder.append(buffer.getInt(i << 2));
+            if (i != capacity - 1) {
+                stringBuilder.append(", ");
+            }
+        }
+        stringBuilder.append("]");
+        return stringBuilder.toString();
     }
 }

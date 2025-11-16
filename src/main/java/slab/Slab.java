@@ -1,6 +1,7 @@
 package slab;
 
 import org.agrona.BitUtil;
+import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.collections.IntArrayQueue;
 import org.agrona.concurrent.UnsafeBuffer;
@@ -88,6 +89,14 @@ public class Slab<T extends Codec> {
         final var page = pages[pageIndex];
         page.getAt(inPageIndex, reusableCodec);
         return reusableCodec;
+    }
+
+    public boolean equalsUnderlying(final int index, final short inCodecOffset, final int compareSize,
+                                    final DirectBuffer otherBuffer, final int otherOffset) {
+        final var inPageIndex = index & inPageIndexMask;
+        final var pageIndex = index >> shiftCount;
+        final var page = pages[pageIndex];
+        return page.equalsUnderlying(inPageIndex, inCodecOffset, compareSize, otherBuffer, otherOffset);
     }
 
     public void removeAt(final int index) {
