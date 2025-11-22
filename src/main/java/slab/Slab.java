@@ -91,12 +91,12 @@ public class Slab<T extends Codec> {
         return reusableCodec;
     }
 
-    public boolean equalsUnderlying(final int index, final short inCodecOffset, final int compareSize,
-                                    final DirectBuffer otherBuffer, final int otherOffset) {
+    public boolean equalsUnderlying(final int index, final DirectBuffer otherBuffer, final int otherOffset) {
         final var inPageIndex = index & inPageIndexMask;
         final var pageIndex = index >> shiftCount;
         final var page = pages[pageIndex];
-        return page.equalsUnderlying(inPageIndex, inCodecOffset, compareSize, otherBuffer, otherOffset);
+        return page.equalsUnderlying(inPageIndex, reusableCodec.keyOffset(), reusableCodec.keyLength(),
+                otherBuffer, otherOffset);
     }
 
     public void removeAt(final int index) {

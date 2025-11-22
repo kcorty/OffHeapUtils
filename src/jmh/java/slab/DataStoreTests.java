@@ -27,8 +27,7 @@ public class DataStoreTests {
     private final BytesToIntOffHeapMap<UnsafeAsciiString> offHeapMap = new BytesToIntOffHeapMap<>(2048,
             () -> new UnsafeAsciiString(40));
 
-    private final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.65f,
-            TestOrder.ASCII_OFFSET, TestOrder.ASCII_LENGTH, slab);
+    private final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.65f, slab);
 
     @Setup(Level.Iteration)
     public void setup() {

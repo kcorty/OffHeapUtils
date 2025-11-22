@@ -12,8 +12,7 @@ public class SlabKeyStoreTests {
         final ConcreteTestOrder concreteTestOrder = new ConcreteTestOrder();
         final Slab<ConcreteTestOrder> slab = new Slab<>((short) 64, 4, () -> new ConcreteTestOrder());
 
-        final SlabKeyStore<ConcreteTestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.65f,
-                ConcreteTestOrder.ASCII_OFFSET, ConcreteTestOrder.ASCII_LENGTH, slab);
+        final SlabKeyStore<ConcreteTestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.65f, slab);
 
         final int index = slab.create(concreteTestOrder);
 
@@ -30,8 +29,7 @@ public class SlabKeyStoreTests {
         final TestOrder testOrder = new TestOrder();
         final Slab<TestOrder> slab = new Slab<>((short) 64, 4, () -> new TestOrder());
 
-        final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.65f,
-                TestOrder.ASCII_OFFSET, TestOrder.ASCII_LENGTH, slab);
+        final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.65f, slab);
 
         for (int i = 0; i < 250000000; i++) {
             final int index = slab.create(testOrder);
@@ -48,8 +46,7 @@ public class SlabKeyStoreTests {
         final TestOrder testOrder2 = new TestOrder();
         final UnsafeAsciiString unsafeAsciiString = new UnsafeAsciiString(TestOrder.ASCII_LENGTH);
         final Slab<TestOrder> slab = new Slab<>((short) 64, 4, () -> new TestOrder());
-        final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(8, 0.65f,
-                TestOrder.ASCII_OFFSET, TestOrder.ASCII_LENGTH, slab);
+        final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(8, 0.65f, slab);
 
         for (int i = 0; i < 10; i++) {
             final int index = slab.create(testOrder);

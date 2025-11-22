@@ -10,8 +10,6 @@ public class SlabKeyStore<T extends Codec> {
 
     private final UnsafeBuffer buffer;
     private final float loadFactor;
-    private final short codecKeyOffset;
-    private final short codecKeySize;
     private final Slab<T> slab;
 
     private int capacity;
@@ -20,13 +18,10 @@ public class SlabKeyStore<T extends Codec> {
 
     private static final int MISSING_VALUE = -1;
 
-    public SlabKeyStore(final int capacity, final float loadFactor, final short codecKeyOffset,
-                        final short codecKeySize, final Slab<T> slab) {
+    public SlabKeyStore(final int capacity, final float loadFactor, final Slab<T> slab) {
         this.capacity = BitUtil.findNextPositivePowerOfTwo(capacity);
         this.loadFactor = loadFactor;
         this.nextResizeLimit = (int) (this.capacity * loadFactor);
-        this.codecKeyOffset = codecKeyOffset;
-        this.codecKeySize = codecKeySize;
         this.slab = slab;
 
         this.buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Integer.BYTES * capacity));
@@ -63,9 +58,7 @@ public class SlabKeyStore<T extends Codec> {
         int index = hashCode & mask;
         int existingSlabIndex;
         while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
-            final var foundCodec = slab.get(existingSlabIndex);
-            if (BufferUtils.bufferEquals(foundCodec.buffer(), codecKeyOffset,
-                    lookupBuffer, bufferOffset, codecKeySize)) {
+            if (slab.equalsUnderlying(existingSlabIndex, lookupBuffer, bufferOffset)) {
                 return existingSlabIndex;
             }
             index = ++index & mask;
@@ -80,9 +73,7 @@ public class SlabKeyStore<T extends Codec> {
         int index = codec.keyHashCode() & mask;
         int existingSlabIndex;
         while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
-            final var foundCodec = slab.get(existingSlabIndex);
-            if (BufferUtils.bufferEquals(foundCodec.buffer(), codecKeyOffset,
-                    codec.buffer(), codecKeyOffset, codecKeySize)) {
+            if (slab.equalsUnderlying(existingSlabIndex, codec.buffer(), codec.keyOffset())) {
                 return existingSlabIndex;
             }
             index = ++index & mask;
@@ -95,8 +86,7 @@ public class SlabKeyStore<T extends Codec> {
         int index = codec.keyHashCode() & mask;
         int existingSlabIndex;
         while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
-            if (slab.equalsUnderlying(existingSlabIndex, codecKeyOffset,
-                    codecKeySize, codec.buffer(), codecKeyOffset)) {
+            if (slab.equalsUnderlying(existingSlabIndex, codec.buffer(), codec.keyOffset())) {
                 buffer.putInt(index << 2, MISSING_VALUE);
                 size--;
                 tryCompact(index);
@@ -113,9 +103,7 @@ public class SlabKeyStore<T extends Codec> {
         int index = hashCode & mask;
         int existingSlabIndex;
         while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
-            final var foundCodec = slab.get(existingSlabIndex);
-            if (BufferUtils.bufferEquals(foundCodec.buffer(), codecKeyOffset,
-                    lookupBuffer, bufferOffset, codecKeySize)) {
+            if (slab.equalsUnderlying(existingSlabIndex, lookupBuffer, bufferOffset)) {
                 this.buffer.putInt(index << 2, MISSING_VALUE);
                 size--;
                 tryCompact(index);

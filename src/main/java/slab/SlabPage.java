@@ -32,7 +32,7 @@ public class SlabPage<T extends Codec> {
         codec.wrap(pageBuffer, codecOffset, codecSize);
     }
 
-    public boolean equalsUnderlying(final int index, final short inCodecOffset, final int compareSize,
+    public boolean equalsUnderlying(final int index, final int inCodecOffset, final int compareSize,
                                  final DirectBuffer otherBuffer, final int otherOffset) {
         final int codecOffset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
         return BufferUtils.bufferEquals(pageBuffer, codecOffset + inCodecOffset,

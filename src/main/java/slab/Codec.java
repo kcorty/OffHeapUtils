@@ -12,4 +12,8 @@ public interface Codec {
     DirectBuffer buffer();
 
     int keyHashCode();
+
+    int keyOffset();
+
+    int keyLength();
 }
