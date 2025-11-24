@@ -1,6 +1,7 @@
 package slab;
 
 import offHeapMutableAsciiString.UnsafeAsciiString;
+import org.agrona.collections.Object2ObjectHashMap;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -41,6 +42,29 @@ public class SlabKeyStoreTests {
     }
 
     @Test
+    //For some reason this fails on bigger i's
+    public void loopingCreateThenRemoveTest() {
+        final TestOrder testOrder = new TestOrder();
+        final TestOrder testOrder2 = new TestOrder();
+        final Slab<TestOrder> slab = new Slab<>((short) 64, 4, () -> new TestOrder());
+
+        final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.5f, slab);
+
+        for (int i = 0; i < 2000000; i++) {
+            final int index = slab.create(testOrder);
+            testOrder.getUnsafeAsciiString().set(String.valueOf(i));
+            slabKeyStore.insert(index, testOrder);
+        }
+
+        for (int i = 0; i < 2000000; i++) {
+            testOrder2.getUnsafeAsciiString().set(String.valueOf(i));
+            final int removedKey = slabKeyStore.removeCodec(testOrder2);
+            assertEquals(removedKey, i);
+            slab.removeAt(removedKey);
+        }
+    }
+
+    @Test
     public void insertionTesting() {
         final TestOrder testOrder = new TestOrder();
         final TestOrder testOrder2 = new TestOrder();
@@ -52,11 +76,11 @@ public class SlabKeyStoreTests {
             final int index = slab.create(testOrder);
             testOrder.getUnsafeAsciiString().set(String.valueOf(i));
             slabKeyStore.insert(index, testOrder);
-            System.out.println(slabKeyStore);
+            System.out.println(slabKeyStore.printDataStore());
         }
 
         assertEquals(10, slabKeyStore.size());
-        System.out.println(slabKeyStore);
+        System.out.println(slabKeyStore.printDataStore());
         for (int i = 0; i < 10; i++) {
             unsafeAsciiString.set(String.valueOf(i));
             final int index = slabKeyStore.wrapFromKey(
@@ -80,7 +104,7 @@ public class SlabKeyStoreTests {
             testOrder2.getUnsafeAsciiString().set(String.valueOf(i));
             final int removedIndex = slabKeyStore.removeCodec(testOrder2);
             assertEquals(i, removedIndex);
-            System.out.println(slabKeyStore);
+            System.out.println(slabKeyStore.printDataStore());
         }
     }
 }

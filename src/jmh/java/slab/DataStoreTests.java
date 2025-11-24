@@ -68,6 +68,15 @@ public class DataStoreTests {
     }
 
     @Benchmark
+    public void testSlabIndexKeyStore() {
+        final int index = slab.create(testOrder);
+        testOrder.getUnsafeAsciiString().set(lookupKey);
+        slabKeyStore.insert(index, testOrder);
+        slabKeyStore.removeAt(index);
+        slab.removeAt(index);
+    }
+
+    @Benchmark
     public void baseline() {
         concreteTestOrder.getUnsafeAsciiString().set(lookupKey);
     }

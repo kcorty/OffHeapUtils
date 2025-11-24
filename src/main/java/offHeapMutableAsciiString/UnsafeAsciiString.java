@@ -10,6 +10,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.InputMismatchException;
 
+import static slab.BufferUtils.segmentHashCodeShortCircuiting;
+
 public class UnsafeAsciiString implements CharSequence, Codec {
     @Getter
     private final MutableDirectBuffer buffer;
@@ -78,15 +80,7 @@ public class UnsafeAsciiString implements CharSequence, Codec {
 
     @Override
     public int hashCode() {
-        int hashCode = 19;
-        for (int i = 0; i + 8 <= this.buffer.capacity(); i += 8) {
-            final var value = this.buffer.getLong(i);
-            if (value == 0) {
-                return hashCode;
-            }
-            hashCode = hashCode * 31 + Long.hashCode(value);
-        }
-        return hashCode;
+        return segmentHashCodeShortCircuiting(this.buffer, 0, this.buffer.capacity());
     }
 
     @Override
@@ -197,5 +191,20 @@ public class UnsafeAsciiString implements CharSequence, Codec {
     @Override
     public int keyHashCode() {
         return hashCode();
+    }
+
+    @Override
+    public int generateKeyHashCode(final MutableDirectBuffer buffer, final int offset) {
+        return hashCode();
+    }
+
+    @Override
+    public int keyOffset() {
+        return 0;
+    }
+
+    @Override
+    public int keyLength() {
+        return buffer.capacity();
     }
 }

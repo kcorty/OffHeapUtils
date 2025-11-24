@@ -99,6 +99,13 @@ public class Slab<T extends Codec> {
                 otherBuffer, otherOffset);
     }
 
+    public int keyHashCode(final int index) {
+        final var inPageIndex = index & inPageIndexMask;
+        final var pageIndex = index >> shiftCount;
+        final var page = pages[pageIndex];
+        return page.keyHashCode(inPageIndex, reusableCodec);
+    }
+
     public void removeAt(final int index) {
         final var inPageIndex = index & inPageIndexMask;
         final var pageIndex = index >> shiftCount;

@@ -3,7 +3,7 @@ package slab;
 import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 
-public interface Codec {
+public interface Codec extends CodecKeyHashGenerator {
 
     short bufferSize();
 

@@ -1,7 +1,11 @@
 package slab;
 
 import org.agrona.DirectBuffer;
+import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
+
+import java.util.function.BiConsumer;
+import java.util.function.ObjIntConsumer;
 
 public class SlabPage<T extends Codec> {
 
@@ -37,6 +41,11 @@ public class SlabPage<T extends Codec> {
         final int codecOffset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
         return BufferUtils.bufferEquals(pageBuffer, codecOffset + inCodecOffset,
                 otherBuffer, otherOffset, compareSize);
+    }
+
+    public int keyHashCode(final int index, final CodecKeyHashGenerator hashGenerator) {
+        final int codecOffset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
+        return hashGenerator.generateKeyHashCode(pageBuffer, codecOffset);
     }
 
     public int removeAt(final int index) {

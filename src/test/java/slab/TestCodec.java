@@ -30,6 +30,21 @@ public class TestCodec implements Codec {
     }
 
     @Override
+    public int generateKeyHashCode(MutableDirectBuffer buffer, int offset) {
+        return buffer.hashCode();
+    }
+
+    @Override
+    public int keyOffset() {
+        return 0;
+    }
+
+    @Override
+    public int keyLength() {
+        return BUFFER_SIZE;
+    }
+
+    @Override
     public int hashCode() {
         return buffer.hashCode();
     }

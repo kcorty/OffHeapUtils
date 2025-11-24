@@ -34,6 +34,21 @@ public class TestOrder implements Codec {
         return BufferUtils.segmentHashCodeShortCircuiting(this.buffer, ASCII_OFFSET, ASCII_LENGTH);
     }
 
+    @Override
+    public int generateKeyHashCode(final MutableDirectBuffer buffer, final int offset) {
+        return BufferUtils.segmentHashCodeShortCircuiting(buffer, offset + ASCII_OFFSET, ASCII_LENGTH);
+    }
+
+    @Override
+    public int keyOffset() {
+        return ASCII_OFFSET;
+    }
+
+    @Override
+    public int keyLength() {
+        return ASCII_LENGTH;
+    }
+
     public UnsafeAsciiString getUnsafeAsciiString() {
         unsafeAsciiString.wrap(this.buffer, ASCII_OFFSET, ASCII_LENGTH);
         return unsafeAsciiString;

@@ -2,6 +2,7 @@ package slab;
 
 import org.agrona.BitUtil;
 import org.agrona.DirectBuffer;
+import org.agrona.collections.Hashing;
 import org.agrona.concurrent.UnsafeBuffer;
 
 import java.nio.ByteBuffer;
@@ -25,7 +26,7 @@ public class SlabKeyStore<T extends Codec> {
         this.slab = slab;
 
         this.buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Integer.BYTES * capacity));
-        this.buffer.setMemory(0, this.buffer.capacity(), (byte) -1);
+        this.buffer.setMemory(0, this.buffer.capacity(), (byte) MISSING_VALUE);
     }
 
     public int size() {
@@ -38,7 +39,7 @@ public class SlabKeyStore<T extends Codec> {
 
     public void insert(final int slabIndex, final T codec) {
         final int mask = this.capacity - 1;
-        int index = codec.keyHashCode() & mask;
+        int index = Hashing.hash(codec.keyHashCode(), mask);
         int existingSlabIndex;
         while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
             if (existingSlabIndex == slabIndex) {
@@ -55,7 +56,7 @@ public class SlabKeyStore<T extends Codec> {
     public int wrapFromKey(final DirectBuffer lookupBuffer, final int bufferOffset,
                            final int hashCode) {
         final int mask = this.capacity - 1;
-        int index = hashCode & mask;
+        int index = Hashing.hash(hashCode, mask);
         int existingSlabIndex;
         while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
             if (slab.equalsUnderlying(existingSlabIndex, lookupBuffer, bufferOffset)) {
@@ -70,9 +71,9 @@ public class SlabKeyStore<T extends Codec> {
     //on a location of the slab. This can lead to incorrect return values and you will overwrite the slab data.
     public int wrapFromKey(final T codec) {
         final int mask = this.capacity - 1;
-        int index = codec.keyHashCode() & mask;
+        int index = Hashing.hash(codec.keyHashCode(), mask);
         int existingSlabIndex;
-        while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
+        while ((existingSlabIndex = buffer.getInt(index << 2)) != MISSING_VALUE) {
             if (slab.equalsUnderlying(existingSlabIndex, codec.buffer(), codec.keyOffset())) {
                 return existingSlabIndex;
             }
@@ -83,9 +84,9 @@ public class SlabKeyStore<T extends Codec> {
 
     public int removeCodec(final T codec) {
         final int mask = this.capacity - 1;
-        int index = codec.keyHashCode() & mask;
+        int index = Hashing.hash(codec.keyHashCode(), mask);
         int existingSlabIndex;
-        while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
+        while ((existingSlabIndex = buffer.getInt(index << 2)) != MISSING_VALUE) {
             if (slab.equalsUnderlying(existingSlabIndex, codec.buffer(), codec.keyOffset())) {
                 buffer.putInt(index << 2, MISSING_VALUE);
                 size--;
@@ -100,9 +101,9 @@ public class SlabKeyStore<T extends Codec> {
     public int removeFromKey(final DirectBuffer lookupBuffer, final int bufferOffset,
                              final int hashCode) {
         final int mask = this.capacity - 1;
-        int index = hashCode & mask;
+        int index = Hashing.hash(hashCode, mask);
         int existingSlabIndex;
-        while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
+        while ((existingSlabIndex = buffer.getInt(index << 2)) != MISSING_VALUE) {
             if (slab.equalsUnderlying(existingSlabIndex, lookupBuffer, bufferOffset)) {
                 this.buffer.putInt(index << 2, MISSING_VALUE);
                 size--;
@@ -115,15 +116,26 @@ public class SlabKeyStore<T extends Codec> {
     }
 
     public boolean removeAt(final int slabIndex) {
-        final T codec = slab.get(slabIndex);
-        return remove(slabIndex, codec);
+        final int mask = this.capacity - 1;
+        int index = Hashing.hash(slab.keyHashCode(slabIndex), mask);
+        int existingSlabIndex;
+        while ((existingSlabIndex = buffer.getInt(index << 2)) != MISSING_VALUE) {
+            if (existingSlabIndex == slabIndex) {
+                buffer.putInt(index << 2, MISSING_VALUE);
+                size--;
+                tryCompact(index);
+                return true;
+            }
+            index = ++index & mask;
+        }
+        return false;
     }
 
     public boolean remove(final int slabIndex, final T codec) {
         final int mask = this.capacity - 1;
-        int index = codec.keyHashCode() & mask;
+        int index = Hashing.hash(codec.keyHashCode(), mask);
         int existingSlabIndex;
-        while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
+        while ((existingSlabIndex = buffer.getInt(index << 2)) != MISSING_VALUE) {
             if (existingSlabIndex == slabIndex) {
                 buffer.putInt(index << 2, MISSING_VALUE);
                 size--;
@@ -146,19 +158,14 @@ public class SlabKeyStore<T extends Codec> {
         this.capacity <<= 1;
 
         final UnsafeBuffer newBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(capacity * Integer.BYTES));
-        newBuffer.setMemory(0, newBuffer.capacity(), (byte) -1);
+        newBuffer.setMemory(0, newBuffer.capacity(), (byte) MISSING_VALUE);
         final int mask = capacity - 1;
         this.nextResizeLimit = (int) (this.capacity * loadFactor);
         for (int readIndex = 0; readIndex < oldCapacity; readIndex++) {
             final int value = buffer.getInt(readIndex << 2);
             if (value != MISSING_VALUE) {
-                final T codec = slab.get(value);
-                if (codec == null) {
-                    //Somebody did something wrong
-                    continue;
-                }
-                int index = codec.keyHashCode() & mask;
-                while (newBuffer.getInt(index << 2) != -1) {
+                int index = Hashing.hash(slab.keyHashCode(value), mask);
+                while (newBuffer.getInt(index << 2) != MISSING_VALUE) {
                     index = ++index & mask;
                 }
                 newBuffer.putInt(index << 2, value);
@@ -170,28 +177,31 @@ public class SlabKeyStore<T extends Codec> {
     private void tryCompact(int deleteIndex) {
         final int mask = capacity - 1;
         int index = deleteIndex;
+        int value = MISSING_VALUE;
+        int hash = MISSING_VALUE;
 
         while (true) {
             index = ++index & mask;
-            final int value = buffer.getInt(index << 2);
-            if (value == MISSING_VALUE) {
+            final int newValue = buffer.getInt(index << 2);
+            if (newValue == MISSING_VALUE) {
                 return;
             }
-
-            final T codec = slab.get(value);
-            final int hash = codec.keyHashCode() & mask;
+            if (value != newValue) {
+                value = newValue;
+                hash = Hashing.hash(slab.keyHashCode(value), mask);
+            }
 
             if ((index < hash && (hash <= deleteIndex || deleteIndex <= index)) ||
                     (hash <= deleteIndex && deleteIndex <= index)) {
 
                 buffer.putInt(deleteIndex << 2, value);
+                buffer.putInt(index << 2, MISSING_VALUE);
                 deleteIndex = index;
             }
         }
     }
 
-    @Override
-    public String toString() {
+    public String printDataStore() {
         final StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("[");
         for (int i = 0; i < capacity; i++) {
