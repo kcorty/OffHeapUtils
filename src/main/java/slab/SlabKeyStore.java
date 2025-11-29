@@ -25,7 +25,7 @@ public class SlabKeyStore<T extends Codec> {
         this.nextResizeLimit = (int) (this.capacity * loadFactor);
         this.slab = slab;
 
-        this.buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Integer.BYTES * capacity));
+        this.buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Integer.BYTES * this.capacity));
         this.buffer.setMemory(0, this.buffer.capacity(), (byte) MISSING_VALUE);
     }
 
@@ -177,8 +177,6 @@ public class SlabKeyStore<T extends Codec> {
     private void tryCompact(int deleteIndex) {
         final int mask = capacity - 1;
         int index = deleteIndex;
-        int value = MISSING_VALUE;
-        int hash = MISSING_VALUE;
 
         while (true) {
             index = ++index & mask;
@@ -186,15 +184,12 @@ public class SlabKeyStore<T extends Codec> {
             if (newValue == MISSING_VALUE) {
                 return;
             }
-            if (value != newValue) {
-                value = newValue;
-                hash = Hashing.hash(slab.keyHashCode(value), mask);
-            }
+            final int hash = Hashing.hash(slab.keyHashCode(newValue), mask);
 
             if ((index < hash && (hash <= deleteIndex || deleteIndex <= index)) ||
                     (hash <= deleteIndex && deleteIndex <= index)) {
 
-                buffer.putInt(deleteIndex << 2, value);
+                buffer.putInt(deleteIndex << 2, newValue);
                 buffer.putInt(index << 2, MISSING_VALUE);
                 deleteIndex = index;
             }

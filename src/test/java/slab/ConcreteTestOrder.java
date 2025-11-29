@@ -11,7 +11,7 @@ public class ConcreteTestOrder extends TestOrder {
 
     public ConcreteTestOrder() {
         this.buffer().wrap(new UnsafeBuffer(ByteBuffer.allocateDirect(this.bufferSize())));
-        this.unsafeAsciiString = new UnsafeAsciiString(this.buffer(), 0, 40);
+        this.unsafeAsciiString = new UnsafeAsciiString(this.buffer(), keyOffset(), keyLength());
     }
 
     public UnsafeAsciiString getUnsafeAsciiString() {

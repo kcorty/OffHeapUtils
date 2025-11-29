@@ -42,13 +42,12 @@ public class SlabKeyStoreTests {
     }
 
     @Test
-    //For some reason this fails on bigger i's
     public void loopingCreateThenRemoveTest() {
         final TestOrder testOrder = new TestOrder();
         final TestOrder testOrder2 = new TestOrder();
-        final Slab<TestOrder> slab = new Slab<>((short) 64, 4, () -> new TestOrder());
+        final Slab<TestOrder> slab = new Slab<>((short) 64, 2 << 15, () -> new TestOrder());
 
-        final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.5f, slab);
+        final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2 << 21, 0.65f, slab);
 
         for (int i = 0; i < 2000000; i++) {
             final int index = slab.create(testOrder);
@@ -61,6 +60,24 @@ public class SlabKeyStoreTests {
             final int removedKey = slabKeyStore.removeCodec(testOrder2);
             assertEquals(removedKey, i);
             slab.removeAt(removedKey);
+        }
+    }
+
+    @Test
+    public void heapLoopingCreateThenRemoveTest() {
+        final Object2ObjectHashMap<UnsafeAsciiString, ConcreteTestOrder> heapMap = new Object2ObjectHashMap<>(
+                2 << 21, 0.65f);
+
+        for (int i = 0; i < 2000000; i++) {
+            final ConcreteTestOrder concreteTestOrder = new ConcreteTestOrder();
+            concreteTestOrder.getUnsafeAsciiString().set(String.valueOf(i));
+            heapMap.put(concreteTestOrder.getUnsafeAsciiString(), concreteTestOrder);
+        }
+
+        for (int i = 0; i < 2000000; i++) {
+            final ConcreteTestOrder concreteTestOrder = new ConcreteTestOrder();
+            concreteTestOrder.getUnsafeAsciiString().set(String.valueOf(i));
+            heapMap.remove(concreteTestOrder.getUnsafeAsciiString());
         }
     }
 

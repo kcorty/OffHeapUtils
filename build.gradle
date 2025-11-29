@@ -31,7 +31,7 @@ tasks.withType(JavaCompile) {
 }
 
 test {
-    jvmArgs('--enable-preview', '--add-opens', 'java.base/jdk.internal.misc=ALL-UNNAMED', '-Dagrona.disable.bounds.checks=true', '--add-modules', 'jdk.incubator.vector')
+    jvmArgs('--enable-preview', '--add-opens', 'java.base/jdk.internal.misc=ALL-UNNAMED', '-Dagrona.disable.bounds.checks=true', '--add-modules', 'jdk.incubator.vector', '-XX:MaxDirectMemorySize=4g', '-Xmx4g', '-Xms4g')
     useJUnitPlatform()
 }
 
