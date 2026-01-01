@@ -1,33 +1,26 @@
-package slab;
+package unsafeSlab;
 
-import org.agrona.BitUtil;
-import org.agrona.DirectBuffer;
-import org.agrona.MutableDirectBuffer;
-import org.agrona.collections.IntArrayQueue;
-import org.agrona.concurrent.UnsafeBuffer;
+import static unsafeSlab.UnsafeSlabPage.SLAB_PAGE_LIVE_PADDING_SIZE;
 
-import java.nio.ByteBuffer;
 import java.util.function.Supplier;
+import org.agrona.BitUtil;
+import org.agrona.UnsafeApi;
+import org.agrona.collections.IntArrayQueue;
 
-import static slab.SlabPage.SLAB_PAGE_LIVE_PADDING_SIZE;
-
-public class Slab<T extends Codec> {
-
-    private int activePagesCount = 0;
-    private SlabPage<T>[] pages;
-
-    private final IntArrayQueue cleanPageIndices;
-    private final Cursor<T> cursor;
-
-    private final int inPageIndexMask;
-    private final int shiftCount;
-
-    private final T reusableCodec;
-    private final int singlePageSize;
+public class UnsafeSlab<T extends UnsafeCodec> implements AutoCloseable {
 
     public static boolean RESET_BUFFER = !"true".equals(System.getProperty("slab.reset.buffer"));
+    private final long memOffset;
+    private final IntArrayQueue cleanPageIndices;
+    private final UnsafeCursor<T> cursor;
+    private final int inPageIndexMask;
+    private final int shiftCount;
+    private final T reusableCodec;
+    private final int singlePageSize;
+    private int activePageCount = 0;
+    private UnsafeSlabPage<T>[] pages;
 
-    public Slab(final short pageSize, final int initialPageCount, final Supplier<T> codecSupplier) {
+    public UnsafeSlab(final short pageSize, final int initialPageCount, final Supplier<T> codecSupplier) {
         this.reusableCodec = codecSupplier.get();
         final short codecSize = reusableCodec.bufferSize();
         final short alignedPageElementCount = (short) BitUtil.findNextPositivePowerOfTwo(pageSize);
@@ -40,32 +33,30 @@ public class Slab<T extends Codec> {
         this.shiftCount = shiftCount;
 
         this.singlePageSize = alignedPageElementCount * (codecSize + SLAB_PAGE_LIVE_PADDING_SIZE);
-        final UnsafeBuffer unsafeBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(
-                initialPageCount * singlePageSize));
+        memOffset = UnsafeApi.allocateMemory((long) initialPageCount * singlePageSize);
         this.cleanPageIndices = new IntArrayQueue(Math.max(initialPageCount, IntArrayQueue.MIN_CAPACITY), -1);
-        this.pages = new SlabPage[initialPageCount];
+        this.pages = new UnsafeSlabPage[initialPageCount];
         for (int i = 0; i < initialPageCount; i++) {
-            addPage(unsafeBuffer, i * singlePageSize, i);
+            addPage(memOffset + ((long) i * singlePageSize), i, false);
         }
-        this.cursor = new Cursor<>(alignedPageElementCount, cleanPageIndices, this::addPage, pages);
+        this.cursor = new UnsafeCursor<>(alignedPageElementCount, cleanPageIndices, this::addPage, pages);
     }
 
     private void addPage() {
-        final UnsafeBuffer buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(singlePageSize));
-        if (activePagesCount + 1 > pages.length) {
-            final SlabPage<T>[] newPages = new SlabPage[pages.length * 2];
+        final long allocOffset = UnsafeApi.allocateMemory(singlePageSize);
+        if (activePageCount + 1 > pages.length) {
+            final UnsafeSlabPage<T>[] newPages = new UnsafeSlabPage[pages.length * 2];
             System.arraycopy(pages, 0, newPages, 0, pages.length);
             pages = newPages;
             this.cursor.setPages(pages);
         }
-        addPage(buffer, 0, activePagesCount);
+        addPage(allocOffset, activePageCount, true);
     }
 
-    private void addPage(final MutableDirectBuffer buffer, final int offset, final int index) {
-        final UnsafeBuffer newBuffer = new UnsafeBuffer(buffer, offset, singlePageSize);
-        final SlabPage<T> slabPage = new SlabPage<>(newBuffer, reusableCodec.bufferSize(), activePagesCount);
+    private void addPage(final long memOffset, final int index, final boolean isOwnAlloc) {
+        final UnsafeSlabPage<T> slabPage = new UnsafeSlabPage<>(memOffset, reusableCodec.bufferSize(),
+                activePageCount++, singlePageSize, isOwnAlloc);
         pages[index] = slabPage;
-        activePagesCount++;
         this.cleanPageIndices.addInt(index);
     }
 
@@ -91,21 +82,6 @@ public class Slab<T extends Codec> {
         return reusableCodec;
     }
 
-    public boolean equalsUnderlying(final int index, final DirectBuffer otherBuffer, final int otherOffset) {
-        final var inPageIndex = index & inPageIndexMask;
-        final var pageIndex = index >> shiftCount;
-        final var page = pages[pageIndex];
-        return page.equalsUnderlying(inPageIndex, reusableCodec.keyOffset(), reusableCodec.keyLength(),
-                otherBuffer, otherOffset);
-    }
-
-    public int keyHashCode(final int index) {
-        final var inPageIndex = index & inPageIndexMask;
-        final var pageIndex = index >> shiftCount;
-        final var page = pages[pageIndex];
-        return page.keyHashCode(inPageIndex, reusableCodec);
-    }
-
     public void removeAt(final int index) {
         final var inPageIndex = index & inPageIndexMask;
         final var pageIndex = index >> shiftCount;
@@ -117,10 +93,20 @@ public class Slab<T extends Codec> {
         freePage(page);
     }
 
-    private void freePage(final SlabPage<T> slabPage) {
+    private void freePage(final UnsafeSlabPage<T> slabPage) {
         if (RESET_BUFFER) {
             slabPage.cleanPage();
         }
         cleanPageIndices.addInt(slabPage.getPageIndex());
+    }
+
+    @Override
+    public void close() {
+        for (final var page : pages) {
+            if (page != null) {
+                page.tryFree();
+            }
+        }
+        UnsafeApi.freeMemory(memOffset);
     }
 }

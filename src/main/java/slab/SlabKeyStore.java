@@ -67,8 +67,6 @@ public class SlabKeyStore<T extends Codec> {
         return MISSING_VALUE;
     }
 
-    //When looking up with a codec, ensure that it was not previously used in a create and is currently wrapped
-    //on a location of the slab. This can lead to incorrect return values and you will overwrite the slab data.
     public int wrapFromKey(final T codec) {
         final int mask = this.capacity - 1;
         int index = Hashing.hash(codec.keyHashCode(), mask);

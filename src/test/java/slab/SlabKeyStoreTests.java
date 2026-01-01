@@ -127,11 +127,20 @@ public class SlabKeyStoreTests {
         final int index2 = slabKeyStore.wrapFromKey(testOrder2);
         assertEquals(-1, index2);
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 5; i++) {
             testOrder2.getUnsafeAsciiString().set(String.valueOf(i));
             final int removedIndex = slabKeyStore.removeCodec(testOrder2);
             assertEquals(i, removedIndex);
             System.out.println(slabKeyStore.printDataStore());
+        }
+        for (int i = 5; i < 10; i++) {
+            unsafeAsciiString.set(String.valueOf(i));
+            final int removedIndex = slabKeyStore.removeFromKey(
+                    unsafeAsciiString.buffer(), 0,
+                    BufferUtils.segmentHashCodeShortCircuiting(
+                            unsafeAsciiString.buffer(), 0, TestOrder.ASCII_LENGTH)
+            );
+            assertEquals(i, removedIndex);
         }
     }
 }

@@ -1,21 +1,19 @@
-package slab;
+package unsafeSlab;
 
 import org.agrona.collections.IntArrayQueue;
 
-public class Cursor<T extends Codec> {
+public class UnsafeCursor<T extends UnsafeCodec> {
 
+    public final int pageElementCount;
     private final IntArrayQueue cleanPageIndices;
-    private SlabPage<T>[] pages;
-
-    private SlabPage<T> currentPage;
     private final Runnable pageGenerator;
-
+    private UnsafeSlabPage<T>[] pages;
+    private UnsafeSlabPage<T> currentPage;
     private int nextPageIndex = 0;
     private int currPageIndex;
-    public final int pageElementCount;
 
-    public Cursor(final int pageElementCount, final IntArrayQueue cleanPageIndices,
-                  final Runnable pageGenerator, final SlabPage<T>[] pages) {
+    public UnsafeCursor(final int pageElementCount, final IntArrayQueue cleanPageIndices,
+                        final Runnable pageGenerator, final UnsafeSlabPage<T>[] pages) {
         this.pageElementCount = pageElementCount;
         this.cleanPageIndices = cleanPageIndices;
         this.pageGenerator = pageGenerator;
@@ -25,7 +23,7 @@ public class Cursor<T extends Codec> {
         this.currPageIndex = currentPage.getPageIndex() * pageElementCount;
     }
 
-    protected void setPages(final SlabPage<T>[] pages) {
+    protected void setPages(final UnsafeSlabPage<T>[] pages) {
         this.pages = pages;
     }
 
@@ -50,8 +48,7 @@ public class Cursor<T extends Codec> {
         this.currentPage.createAt(nextPageIndex, codec);
     }
 
-    protected SlabPage<T> getCurrentPage() {
+    protected UnsafeSlabPage<T> getCurrentPage() {
         return this.currentPage;
     }
-
 }
