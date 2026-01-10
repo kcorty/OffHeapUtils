@@ -35,7 +35,6 @@ public class DataStoreTests {
     private final UnsafeTestOrder unsafeTestOrder = new UnsafeTestOrder();
 
     private final UnsafeSlab<UnsafeTestOrder> unsafeSlab = new UnsafeSlab<>((short) 256, 8, () -> this.unsafeTestOrder);
-    private final UnsafeSlabKeyStore<>
 
     @Setup(Level.Iteration)
     public void setup() {
