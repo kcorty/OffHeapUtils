@@ -1,17 +1,14 @@
-package slab;
+package unsafeSlab;
 
 import org.agrona.BitUtil;
-import org.agrona.DirectBuffer;
+import org.agrona.UnsafeApi;
 import org.agrona.collections.Hashing;
-import org.agrona.concurrent.UnsafeBuffer;
 
-import java.nio.ByteBuffer;
+public class UnsafeSlabKeyStore<T extends UnsafeCodec> implements AutoCloseable {
 
-public class SlabKeyStore<T extends Codec> {
-
-    private final UnsafeBuffer buffer;
+    private long memOffset;
     private final float loadFactor;
-    private final Slab<T> slab;
+    private final UnsafeSlab<T> slab;
 
     private int capacity;
     private int nextResizeLimit;
@@ -19,14 +16,14 @@ public class SlabKeyStore<T extends Codec> {
 
     private static final int MISSING_VALUE = -1;
 
-    public SlabKeyStore(final int capacity, final float loadFactor, final Slab<T> slab) {
+    public UnsafeSlabKeyStore(final int capacity, final float loafFactor, final UnsafeSlab<T> slab) {
         this.capacity = BitUtil.findNextPositivePowerOfTwo(capacity);
-        this.loadFactor = loadFactor;
+        this.loadFactor = loafFactor;
         this.nextResizeLimit = (int) (this.capacity * loadFactor);
         this.slab = slab;
 
-        this.buffer = new UnsafeBuffer(ByteBuffer.allocateDirect(Integer.BYTES * this.capacity));
-        this.buffer.setMemory(0, this.buffer.capacity(), (byte) MISSING_VALUE);
+        this.memOffset = UnsafeApi.allocateMemory(capacity);
+        UnsafeApi.setMemory(memOffset, capacity, (byte) MISSING_VALUE);
     }
 
     public int size() {
@@ -41,7 +38,7 @@ public class SlabKeyStore<T extends Codec> {
         final int mask = this.capacity - 1;
         int index = Hashing.hash(codec.keyHashCode(), mask);
         int existingSlabIndex;
-        while ((existingSlabIndex = buffer.getInt(index << 2)) != -1) {
+        while ((existingSlabIndex = UnsafeApi.getInt(getOffset(index))) != MISSING_VALUE) {
             if (existingSlabIndex == slabIndex) {
                 return;
             }
@@ -49,7 +46,7 @@ public class SlabKeyStore<T extends Codec> {
         }
 
         size++;
-        buffer.putInt(index << 2, slabIndex);
+        UnsafeApi.putInt(getOffset(index), slabIndex);
         tryIncreaseCapacity();
     }
 
@@ -57,10 +54,11 @@ public class SlabKeyStore<T extends Codec> {
         final int mask = this.capacity - 1;
         int index = Hashing.hash(codec.keyHashCode(), mask);
         int existingSlabIndex;
-        while ((existingSlabIndex = buffer.getInt(index << 2)) != MISSING_VALUE) {
+        while ((existingSlabIndex = UnsafeApi.getInt(getOffset(index))) != MISSING_VALUE) {
             if (slab.equalsUnderlying(existingSlabIndex, codec)) {
                 return existingSlabIndex;
             }
+
             index = ++index & mask;
         }
         return MISSING_VALUE;
@@ -70,9 +68,9 @@ public class SlabKeyStore<T extends Codec> {
         final int mask = this.capacity - 1;
         int index = Hashing.hash(codec.keyHashCode(), mask);
         int existingSlabIndex;
-        while ((existingSlabIndex = buffer.getInt(index << 2)) != MISSING_VALUE) {
+        while ((existingSlabIndex = UnsafeApi.getInt(getOffset(index))) != MISSING_VALUE) {
             if (slab.equalsUnderlying(existingSlabIndex, codec)) {
-                buffer.putInt(index << 2, MISSING_VALUE);
+                UnsafeApi.putInt(getOffset(index), MISSING_VALUE);
                 size--;
                 tryCompact(index);
                 return existingSlabIndex;
@@ -86,9 +84,9 @@ public class SlabKeyStore<T extends Codec> {
         final int mask = this.capacity - 1;
         int index = Hashing.hash(slab.keyHashCode(slabIndex), mask);
         int existingSlabIndex;
-        while ((existingSlabIndex = buffer.getInt(index << 2)) != MISSING_VALUE) {
+        while ((existingSlabIndex = UnsafeApi.getInt(getOffset(index))) != MISSING_VALUE) {
             if (existingSlabIndex == slabIndex) {
-                buffer.putInt(index << 2, MISSING_VALUE);
+                UnsafeApi.putInt(getOffset(index), MISSING_VALUE);
                 size--;
                 tryCompact(index);
                 return true;
@@ -108,21 +106,21 @@ public class SlabKeyStore<T extends Codec> {
         final int oldCapacity = this.capacity;
         this.capacity <<= 1;
 
-        final UnsafeBuffer newBuffer = new UnsafeBuffer(ByteBuffer.allocateDirect(capacity * Integer.BYTES));
-        newBuffer.setMemory(0, newBuffer.capacity(), (byte) MISSING_VALUE);
+        final long newMemOffset = UnsafeApi.allocateMemory(capacity);
+        UnsafeApi.setMemory(newMemOffset, capacity, (byte) MISSING_VALUE);
         final int mask = capacity - 1;
         this.nextResizeLimit = (int) (this.capacity * loadFactor);
         for (int readIndex = 0; readIndex < oldCapacity; readIndex++) {
-            final int value = buffer.getInt(readIndex << 2);
+            final int value = UnsafeApi.getInt(getOffset(readIndex));
             if (value != MISSING_VALUE) {
                 int index = Hashing.hash(slab.keyHashCode(value), mask);
-                while (newBuffer.getInt(index << 2) != MISSING_VALUE) {
+                while (UnsafeApi.getInt(newMemOffset + ((long) index << 2)) != MISSING_VALUE) {
                     index = ++index & mask;
                 }
-                newBuffer.putInt(index << 2, value);
+                UnsafeApi.putInt(newMemOffset + ((long) index << 2), value);
             }
         }
-        this.buffer.wrap(newBuffer, 0, newBuffer.capacity());
+        this.memOffset = newMemOffset;
     }
 
     private void tryCompact(int deleteIndex) {
@@ -131,32 +129,29 @@ public class SlabKeyStore<T extends Codec> {
 
         while (true) {
             index = ++index & mask;
-            final int newValue = buffer.getInt(index << 2);
-            if (newValue == MISSING_VALUE) {
+            final int newValue = UnsafeApi.getInt(getOffset(index));
+            if (newValue != MISSING_VALUE) {
                 return;
             }
+
             final int hash = Hashing.hash(slab.keyHashCode(newValue), mask);
 
             if ((index < hash && (hash <= deleteIndex || deleteIndex <= index)) ||
                     (hash <= deleteIndex && deleteIndex <= index)) {
 
-                buffer.putInt(deleteIndex << 2, newValue);
-                buffer.putInt(index << 2, MISSING_VALUE);
+                UnsafeApi.putInt(getOffset(deleteIndex), newValue);
+                UnsafeApi.putInt(getOffset(index), MISSING_VALUE);
                 deleteIndex = index;
             }
         }
     }
 
-    public String printDataStore() {
-        final StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("[");
-        for (int i = 0; i < capacity; i++) {
-            stringBuilder.append(buffer.getInt(i << 2));
-            if (i != capacity - 1) {
-                stringBuilder.append(", ");
-            }
-        }
-        stringBuilder.append("]");
-        return stringBuilder.toString();
+    private long getOffset(final int index) {
+        return memOffset + ((long) index << 2);
+    }
+
+    @Override
+    public void close() {
+        UnsafeApi.freeMemory(memOffset);
     }
 }

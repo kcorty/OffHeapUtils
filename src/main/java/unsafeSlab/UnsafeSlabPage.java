@@ -1,6 +1,7 @@
 package unsafeSlab;
 
 import org.agrona.UnsafeApi;
+import utils.UnsafeBufferUtils;
 
 public class UnsafeSlabPage<T extends UnsafeCodec> {
 
@@ -22,15 +23,26 @@ public class UnsafeSlabPage<T extends UnsafeCodec> {
     }
 
     public void createAt(final int index, final T codec) {
-        final long pageOffset = getOffset(index);
+        final long offset = getOffset(index);
         liveCounter++;
-        UnsafeApi.putByte(pageOffset, (byte) 1);
-        codec.wrap(pageOffset + SLAB_PAGE_LIVE_PADDING_SIZE);
+        UnsafeApi.putByte(offset, (byte) 1);
+        codec.wrap(offset + SLAB_PAGE_LIVE_PADDING_SIZE);
     }
 
     public void getAt(final int index, final T codec) {
-        final long codecOffset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
-        codec.wrap(codecOffset);
+        final long offset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
+        codec.wrap(offset);
+    }
+
+    public boolean equalsUnderlying(final int index, final T codec) {
+        final long offset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
+        return UnsafeBufferUtils.bufferEquals(offset + codec.keyOffset(),
+                codec.memOffset() + codec.keyOffset(), codec.keyLength());
+    }
+
+    public int keyHashCode(final int index, final UnsafeCodecKeyHashGenerator hashGenerator) {
+        final long offset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
+        return hashGenerator.generateKeyHashCode(offset);
     }
 
     public int removeAt(final int index) {

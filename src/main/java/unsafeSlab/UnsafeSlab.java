@@ -82,6 +82,20 @@ public class UnsafeSlab<T extends UnsafeCodec> implements AutoCloseable {
         return reusableCodec;
     }
 
+    public boolean equalsUnderlying(final int index, final T codec) {
+        final int inPageIndex = index & inPageIndexMask;
+        final int pageIndex = index >> shiftCount;
+        final var page = pages[pageIndex];
+        return page.equalsUnderlying(inPageIndex, codec);
+    }
+
+    public int keyHashCode(final int index) {
+        final int inPageIndex = index & inPageIndexMask;
+        final int pageIndex = index >> shiftCount;
+        final var page = pages[pageIndex];
+        return page.keyHashCode(inPageIndex, reusableCodec);
+    }
+
     public void removeAt(final int index) {
         final var inPageIndex = index & inPageIndexMask;
         final var pageIndex = index >> shiftCount;

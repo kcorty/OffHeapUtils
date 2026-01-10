@@ -4,6 +4,9 @@ import offHeapDataStructures.BytesToIntOffHeapMap;
 import offHeapTypes.DirectBufferUnsafeString;
 import org.agrona.collections.Object2ObjectHashMap;
 import org.openjdk.jmh.annotations.*;
+import unsafeSlab.UnsafeSlab;
+import unsafeSlab.UnsafeSlabKeyStore;
+import unsafeSlab.UnsafeTestOrder;
 
 import java.util.ArrayDeque;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +31,11 @@ public class DataStoreTests {
             () -> new DirectBufferUnsafeString(40));
 
     private final SlabKeyStore<TestOrder> slabKeyStore = new SlabKeyStore<>(2048, 0.65f, slab);
+
+    private final UnsafeTestOrder unsafeTestOrder = new UnsafeTestOrder();
+
+    private final UnsafeSlab<UnsafeTestOrder> unsafeSlab = new UnsafeSlab<>((short) 256, 8, () -> this.unsafeTestOrder);
+    private final UnsafeSlabKeyStore<>
 
     @Setup(Level.Iteration)
     public void setup() {

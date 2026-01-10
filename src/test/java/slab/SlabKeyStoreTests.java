@@ -4,8 +4,6 @@ import offHeapTypes.DirectBufferUnsafeString;
 import org.agrona.collections.Object2ObjectHashMap;
 import org.agrona.concurrent.UnsafeBuffer;
 import org.junit.jupiter.api.Test;
-import utils.DirectBufferUtils;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -25,7 +23,7 @@ public class SlabKeyStoreTests {
         concreteTestOrder.getUnsafeAsciiString().set("ABC123");
         slabKeyStore.insert(index, concreteTestOrder);
 
-        slabKeyStore.remove(index, concreteTestOrder);
+        slabKeyStore.removeCodec(concreteTestOrder);
         slab.removeAt(index);
 
     }
@@ -110,22 +108,16 @@ public class SlabKeyStoreTests {
         assertEquals(10, slabKeyStore.size());
         System.out.println(slabKeyStore.printDataStore());
         for (int i = 0; i < 10; i++) {
-            directBufferUnsafeString.set(String.valueOf(i));
-            final int index = slabKeyStore.wrapFromKey(
-                    directBufferUnsafeString.buffer(), 0,
-                    DirectBufferUtils.segmentHashCodeShortCircuiting(
-                            directBufferUnsafeString.buffer(), 0, TestOrder.ASCII_LENGTH));
-            assertEquals(i, index);
             testOrder2.getUnsafeAsciiString().set(String.valueOf(i));
-            final int index2 = slabKeyStore.wrapFromKey(testOrder2);
+            final int index2 = slabKeyStore.getKey(testOrder2);
             assertEquals(i, index2);
         }
         testOrder2.getUnsafeAsciiString().set("MISS");
-        final int index = slabKeyStore.wrapFromKey(testOrder2);
+        final int index = slabKeyStore.getKey(testOrder2);
         assertEquals(-1, index);
 
         testOrder2.getUnsafeAsciiString().set("INVALID");
-        final int index2 = slabKeyStore.wrapFromKey(testOrder2);
+        final int index2 = slabKeyStore.getKey(testOrder2);
         assertEquals(-1, index2);
 
         for (int i = 0; i < 5; i++) {
@@ -133,15 +125,6 @@ public class SlabKeyStoreTests {
             final int removedIndex = slabKeyStore.removeCodec(testOrder2);
             assertEquals(i, removedIndex);
             System.out.println(slabKeyStore.printDataStore());
-        }
-        for (int i = 5; i < 10; i++) {
-            directBufferUnsafeString.set(String.valueOf(i));
-            final int removedIndex = slabKeyStore.removeFromKey(
-                    directBufferUnsafeString.buffer(), 0,
-                    DirectBufferUtils.segmentHashCodeShortCircuiting(
-                            directBufferUnsafeString.buffer(), 0, TestOrder.ASCII_LENGTH)
-            );
-            assertEquals(i, removedIndex);
         }
     }
 }

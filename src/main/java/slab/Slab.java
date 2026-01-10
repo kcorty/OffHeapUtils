@@ -91,12 +91,11 @@ public class Slab<T extends Codec> {
         return reusableCodec;
     }
 
-    public boolean equalsUnderlying(final int index, final DirectBuffer otherBuffer, final int otherOffset) {
+    public boolean equalsUnderlying(final int index, final T codec) {
         final var inPageIndex = index & inPageIndexMask;
         final var pageIndex = index >> shiftCount;
         final var page = pages[pageIndex];
-        return page.equalsUnderlying(inPageIndex, reusableCodec.keyOffset(), reusableCodec.keyLength(),
-                otherBuffer, otherOffset);
+        return page.equalsUnderlying(inPageIndex, codec);
     }
 
     public int keyHashCode(final int index) {

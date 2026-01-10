@@ -5,6 +5,7 @@ import org.agrona.DirectBuffer;
 import org.agrona.MutableDirectBuffer;
 import org.agrona.concurrent.UnsafeBuffer;
 import slab.Codec;
+import utils.DirectBufferUtils;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -88,33 +89,13 @@ public class DirectBufferUnsafeString implements CharSequence, Codec {
         if (this == object) {
             return true;
         }
-        if (object instanceof final DirectBufferUnsafeString other) {
-            if (this.buffer.capacity() == other.buffer.capacity()) {
-                return this.buffer.compareTo(other.buffer) == 0;
-            }
-            if (this.buffer.capacity() > other.buffer.capacity()) {
-                return unsafeEquals(other, this);
-            }
-            return unsafeEquals(this, other);
-        }
-
-        if (object instanceof final CharSequence otherCharSequence) {
-            return CharSequenceUtils.equals(this, otherCharSequence);
-        }
-        return false;
+        return switch (object) {
+            case final DirectBufferUnsafeString other -> DirectBufferUtils.bufferEquals(buffer, other.buffer(), 0, other.buffer.capacity());
+            case final CharSequence other -> CharSequenceUtils.equals(this, other);
+            default -> false;
+        };
     }
 
-    //TODO: Explore whether backwards heuristic is quicker
-    public static boolean unsafeEquals(final DirectBufferUnsafeString a, final DirectBufferUnsafeString b) {
-        for (int i = 0; i + 8 <= a.buffer.capacity(); i += 8) {
-            if (a.buffer.getLong(i) != b.buffer.getLong(i)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    //TODO: Explore whether backwards heuristic is quicker
     public void padRemainder(final int beginOffset) {
         final int length = this.buffer.capacity();
         int i = beginOffset;
@@ -136,7 +117,7 @@ public class DirectBufferUnsafeString implements CharSequence, Codec {
     }
 
     @Override
-    public char charAt(int index) {
+    public char charAt(final int index) {
         if (index < 0 || index >= length()) {
             throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + length());
         }
@@ -144,7 +125,7 @@ public class DirectBufferUnsafeString implements CharSequence, Codec {
     }
 
     @Override
-    public CharSequence subSequence(int start, int end) {
+    public CharSequence subSequence(final int start, final int end) {
         if (start < 0 || end < 0) {
             throw new IndexOutOfBoundsException("Index: " + start + ", Length: " + end);
         }
@@ -160,7 +141,6 @@ public class DirectBufferUnsafeString implements CharSequence, Codec {
         return this.buffer.getStringAscii(0);
     }
 
-    //TODO: parallelize on long and then recur when long == 0
     public int getLength() {
         int length = 0;
         while (length < this.buffer.capacity()) {

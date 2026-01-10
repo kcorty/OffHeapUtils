@@ -33,11 +33,10 @@ public class SlabPage<T extends Codec> {
         codec.wrap(pageBuffer, codecOffset, codecSize);
     }
 
-    public boolean equalsUnderlying(final int index, final int inCodecOffset, final int compareSize,
-                                 final DirectBuffer otherBuffer, final int otherOffset) {
+    public boolean equalsUnderlying(final int index, final T codec) {
         final int codecOffset = getOffset(index) + SLAB_PAGE_LIVE_PADDING_SIZE;
-        return DirectBufferUtils.bufferEquals(pageBuffer, codecOffset + inCodecOffset,
-                otherBuffer, otherOffset, compareSize);
+        return DirectBufferUtils.bufferEquals(pageBuffer, codecOffset + codec.keyOffset(),
+                codec.buffer(), codec.keyOffset(), codec.keyLength());
     }
 
     public int keyHashCode(final int index, final CodecKeyHashGenerator hashGenerator) {
